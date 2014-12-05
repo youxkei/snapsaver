@@ -14,8 +14,8 @@
                     <div ng-init="id = '<%= @id %>'"></div>
                 <% end %>
 
-                <div style="height: 100%; margin: 0px">
-                    <div style="top: 0px; height: 100%; width: 50%">
+                <div>
+                    <div>
                         <% if user_signed_in? %>
                             <h1 style="margin-top: 0px"><%= @site %></h1>
                             <p><a href="https://bitbucket.org/snapsaver/<%= @uuid %>-<%= @site %>/commits/all">https://bitbucket.org/snapsaver/<%= @uuid %>-<%= @site %>/commits/all</a></p>
