@@ -73,25 +73,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.ssh.shell = "bash -c 'BASH_ENV=/etc/profile exec bash'"
 
   config.vm.provision :shell, inline: <<-EOS
+    add-apt-repository -y ppa:brightbox/ruby-ng
     apt-get -y update
     apt-get install -y git ruby-dev nodejs libsqlite3-dev libssl-dev libreadline6-dev xvfb tmux
     apt-get install -y libasound2 libgtk2.0-0 fonts-takao-gothic
+    apt-get -y install ruby2.1
   EOS
 
   config.vm.provision :shell, inline: <<-EOS, privileged: false
-    if [ ! -e ~/.anyenv ]; then
-      git clone https://github.com/riywo/anyenv ~/.anyenv
-      echo 'export PATH="$HOME/.anyenv/bin:$PATH"' >> ~/.bash_profile
-      echo 'eval "$(anyenv init -)"' >> ~/.bash_profile
-      source ~/.bash_profile
-
-      anyenv install rbenv
-    fi
-
     source ~/.bash_profile
-
-    rbenv install 2.1.2
-    rbenv global  2.1.2
 
     gem install bundler --no-ri --no-rdoc
 
