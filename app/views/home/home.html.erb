@@ -14,8 +14,8 @@
                     <div ng-init="id = '<%= @id %>'"></div>
                 <% end %>
 
-                <div style="height: 100%; margin: 0px">
-                    <div style="top: 0px; height: 100%; width: 50%; box-sizing: border-box;">
+                <div>
+                    <div>
                         <% if user_signed_in? %>
                             <h1 style="margin-top: 0px"><%= @site %></h1>
                             <p><a href="https://bitbucket.org/snapsaver/<%= @uuid %>-<%= @site %>/commits/all">https://bitbucket.org/snapsaver/<%= @uuid %>-<%= @site %>/commits/all</a></p>
@@ -28,29 +28,32 @@
 
                     <div class="url-list-box">
                         <div class="row">
-                            <div class="col-sm-8">
-                                <textarea ng-model="urls" ng-init="urls = '<%= @urls %>'" placeholder="URLリスト"></textarea>
-                            </div>
-                            <div class="col-sm-4">
-                                <% if user_signed_in? || @id %>
-                                    <button ng-click="save();" class="btn btn-primary">URLリスト保存</button>
-                                <% else %>
-                                    <form action="/inner_api/make_id" method="post" >
-                                        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
-                                        <input type="hidden" name="urls" ng-value="urls">
-                                        <input type="submit" value="URLリスト保存" class="btn btn-primary">
-                                    </form>
-                                <% end %>
+                            <div class="form-group">
+                                <div class="col-xs-8">
+                                    <textarea class="form-control" ng-model="urls" ng-init="urls = '<%= @urls %>'" placeholder="URLリスト"></textarea>
+                                </div>
+
+                                <div class="col-xs-4">
+                                    <% if user_signed_in? || @id %>
+                                        <button ng-click="save();" class="btn btn-primary">URLリスト保存</button>
+                                    <% else %>
+                                        <form action="/inner_api/make_id" method="post" >
+                                            <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+                                            <input type="hidden" name="urls" ng-value="urls">
+                                            <input type="submit" value="URLリスト保存" class="btn btn-primary">
+                                        </form>
+                                    <% end %>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <% if user_signed_in? || @id %>
                         <div class="well well-sm taking-snap-shot">
-                            <textarea ng-model="commit_message" placeholder="コミットメッセージ"></textarea><br>
-                            <div>
-                                <span>ブレークポイント：</span>
-                                <select ng-model="breakpointSelected" ng-options="breakpoint for breakpoint in breakpoints"></select>
+                            <textarea class="form-control" ng-model="commit_message" placeholder="コミットメッセージ"></textarea>
+                            <div class="breakpoint">
+                                <label class="control-label">ブレークポイント：</label>
+                                <select class="form-control" ng-model="breakpointSelected" ng-options="breakpoint for breakpoint in breakpoints"></select>
                             </div>
                             <button ng-disabled="shootingSnapshot" ng-click="shoot(0);" class="btn btn-success">
                                 <strong>スナップショットを取る</strong>
@@ -58,23 +61,37 @@
                         </div>
                     <% end %>
 
-                    <div>
-                        <% if user_signed_in? %>
-                            <form action="/home/change_site" method="post">
-                                <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>"/>
-                                <select name="site" ng-model="siteSelected" ng-options="site for site in sites track by site"></select>
-                                <input type="submit" value="URLリストを変更"/>
-                            </form>
-                            <form action="/home/add_site" method="post">
-                                <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>"/>
-                                <input type="text"   name="site"/>
-                                <input type="submit" value="URLリストを追加"/>
-                            </form>
-                            <p><%= link_to "ログアウト", destroy_user_session_path, method: :delete %></p>
-                        <% else %>
-                            <p><%= link_to "ログイン", new_user_session_path %></p>
-                        <% end %>
-                    </div>
+                    <% if user_signed_in? %>
+                        <div class="well well-sm">
+                            <div class="row">
+                                <form class="form-group" role="form" action="/home/change_site" method="post">
+                                    <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>"/>
+                                    <div class="col-xs-8">
+                                        <select class="form-control" name="site" ng-model="siteSelected" ng-options="site for site in sites track by site"></select>
+                                    </div>
+                                    <div class="col-xs-4">
+                                        <input class="form-control" type="submit" value="URLリストを変更"/>
+                                    </div>
+                                </form>
+
+                                <form class="form-group" role="form" action="/home/add_site" method="post">
+                                    <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>"/>
+                                    <div class="col-xs-8">
+                                        <input class="form-control" type="text" name="site"/>
+                                    </div>
+                                    <div class="col-xs-4">
+                                        <input class="form-control" type="submit" value="URLリストを追加"/>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <p><%= link_to "ログアウト", destroy_user_session_path, method: :delete %></p>
+
+                    <% else %>
+                        <p><%= link_to "ログイン", new_user_session_path %></p>
+                    <% end %>
+
                 </div>
             </div>
         </div>
