@@ -74,17 +74,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.provision :shell, inline: <<-EOS
     add-apt-repository -y ppa:brightbox/ruby-ng
-    apt-get -y update
-    apt-get install -y git ruby-dev nodejs libsqlite3-dev libssl-dev libreadline6-dev xvfb tmux
+    apt-get update -y
+    apt-get install -y ruby2.1 ruby2.1-dev
+    apt-get install -y git nodejs libsqlite3-dev libssl-dev libreadline6-dev xvfb tmux
     apt-get install -y libasound2 libgtk2.0-0 fonts-takao-gothic
-    apt-get -y install ruby2.1
+    gem install bundler --no-ri --no-rdoc
   EOS
 
   config.vm.provision :shell, inline: <<-EOS, privileged: false
-    source ~/.bash_profile
-
-    gem install bundler --no-ri --no-rdoc
-
     cd /vagrant; bundle install
 
     cp vagrant.ssh.config ~/.ssh/config
