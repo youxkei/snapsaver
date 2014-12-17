@@ -5,20 +5,46 @@ include HomeHelper
 
 class LatestImagesController < ApplicationController
   def latest_images
-    id = params[:id]
-
     if user_signed_in?
-      @site_name = user_session["current_site_name"]
-      urls = current_user.sites.find_by(name: @site_name).urls
-      repository_name = current_user.uuid + "-" + @site_name
+      if user_session["current_url_list_name"]
+        url_list_name = user_session["current_url_list_name"]
+      else
+        @http_status_code = 400
+        @error_message = "User session does not have current URL list"
+        render status: 400, template: "error/error"
+        return
+      end
 
-    elsif id
-      @site_name = id
-      urls = Site.find_by(name: @site_name).urls
-      repository_name = id
+      url_list = current_user.url_lists.find_by name: url_list_name
+
+      if url_list.nil?
+        @http_status_code = 400
+        @error_message = "User session has invalid current URL list"
+        render status: 400, template: "error/error"
+        return
+      end
+
+      repository_name = "#{current_user.uuid}-#{url_list.name}"
     else
-      redirect_to "/"
-      return
+      if params[:url_list_name]
+        url_list_name = params[:url_list_name]
+      else
+        @http_status_code = 400
+        @error_message = "URL list not specified"
+        render status: 400, template: "error/error"
+        return
+      end
+
+      url_list = UrlList.find_by name: url_list_name
+
+      if url_list.nil?
+        @http_status_code = 400
+        @error_message = "URL list not found"
+        render status: 400, template: "error/error"
+        return
+      end
+
+      repository_name = url_list.name
     end
 
     repository = Git.open("repo/#{repository_name}")
@@ -26,12 +52,13 @@ class LatestImagesController < ApplicationController
     if repository.branches.size > 0
       head_sha = repository.gcommit("HEAD").sha
     else
-      redirect_to "/"
-      return
+      @http_status_code = 400
+      @error_message = "Empty repository"
+      render status: 400, template: "error/error"
     end
 
-    
-    @latest_images = urls.split("\n").map{ |url|
+    @url_list_name = url_list_name
+    @latest_images = url_list.urls.split("\n").map{ |url|
       BREAKPOINTS.map{ |breakpoint|
         {
           breakpoint: breakpoint,
@@ -40,6 +67,5 @@ class LatestImagesController < ApplicationController
         }
       }
     }
-
   end
 end

@@ -44,8 +44,10 @@ gem 'git'
 gem 'selenium-webdriver'
 gem "headless"
 gem "devise"
-gem "test-unit-rails", group: [:development, :test]
+gem "rspec-rails", "~> 3.0", group: [:development, :test]
 gem 'factory_girl_rails', group: [:development, :test]
+gem 'pry-byebug', group: [:development, :test]
+gem 'simplecov', group: [:test]
 
 gem "rails-assets-angular"
 gem 'rails-assets-bootstrap'

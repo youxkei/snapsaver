@@ -16,7 +16,7 @@ module HomeHelper
     sock = Net::HTTP.new("api.bitbucket.org", 443)
     sock.use_ssl = true
     sock.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    sock.set_debug_output $stderr
+    #sock.set_debug_output $stderr
 
     sock.start do |http|
       response = http.request(req)

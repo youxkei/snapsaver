@@ -8,25 +8,51 @@ include HomeHelper
 class InnerApiController < ApplicationController
   @@screen_shooters = {}
 
-  def make_id
-    id = SecureRandom.uuid
+  def make_orphan_url_list
+    if user_signed_in?
+      render status: 400, json: {error: "Should not log in"}
+      return
+    end
 
-    create_bitbucket_repository id
+    url_list_name = SecureRandom.uuid
 
-    repo = Git.clone "git@bitbucket.org:#{ENV["BITBUCKET_USER"]}/#{id}.git", "repo/#{id}"
+    create_bitbucket_repository url_list_name
+
+    repo = Git.clone "git@bitbucket.org:#{ENV["BITBUCKET_USER"]}/#{url_list_name}.git", "repo/#{url_list_name}"
     repo.config "user.name", ENV["BITBUCKET_USER"]
     repo.config "user.email", ENV["BITBUCKET_USER"]
 
-    Site.create name: id, urls: params[:urls]
-    redirect_to "/id/#{id}"
+    UrlList.create name: url_list_name, urls: params[:urls]
+    redirect_to "/id/#{url_list_name}"
   end
 
   def save_urls
     if user_signed_in?
-      current_site_name = user_session["current_site_name"]
+      if user_session["current_url_list_name"]
+        url_list_name = user_session["current_url_list_name"]
+      else
+        render status: 400, json: {error: "User session does not have current URL list"}
+        return
+      end
 
-      if current_site_name.nil?
-        render json: {error: "invalid session"}
+      url_list = current_user.url_lists.find_by name: url_list_name
+
+      if url_list.nil?
+        render status: 400, json: {error: "User session has invalid current URL list"}
+        return
+      end
+    else
+      if params[:url_list_name]
+        url_list_name = params[:url_list_name]
+      else
+        render status: 400, json: {error: "URL list not specified"}
+        return
+      end
+
+      url_list = UrlList.find_by name: url_list_name
+
+      if url_list.nil?
+        render status: 400, json: {error: "URL list not found"}
         return
       end
     end
@@ -34,158 +60,171 @@ class InnerApiController < ApplicationController
     urls = params[:urls].split("\n").map{ |url| url.strip }
     valid_urls =   urls.select{ |url| URI.parse(url).kind_of?(URI::HTTP) rescue false }
     invalid_urls = urls.reject{ |url| URI.parse(url).kind_of?(URI::HTTP) rescue false }
-    valid_urls_str = valid_urls.join "\n"
+    valid_urls_joined = valid_urls.join "\n"
 
-    if user_signed_in?
-      site = current_user.sites.find_by name: current_site_name
-      site.urls = valid_urls_str
-      site.save
-    else
-      site = Site.find_by name: params[:id]
-      site.urls = valid_urls_str
-      site.save
-    end
+    url_list.urls = valid_urls_joined
+    url_list.save
 
     render json: {message: "URLリストを保存しました",
-                  urls: valid_urls_str,
+                  urls: valid_urls_joined,
                   urls_size: valid_urls.size,
                   invalid_urls: invalid_urls}
   end
 
   def shoot
-    begin
-      if user_signed_in?
-        site_name = user_session["current_site_name"]
+    if user_signed_in?
+      if user_session["current_url_list_name"]
+        url_list_name = user_session["current_url_list_name"]
       else
-        site_name = params[:id]
-      end
-
-      if site_name.nil?
-        render status: 400, json: {error: "invalid session"}
+        render status: 400, json: {error: "User session does not have current URL list"}
         return
       end
 
-      if user_signed_in?
-        site = current_user.sites.find_by name: site_name
-        # FIXME: 非常にアレな実装。repository_nameとかを使うべき
-        site_name = current_user.uuid + "-" + site_name
+      url_list = current_user.url_lists.find_by name: url_list_name
+
+      if url_list.nil?
+        render status: 400, json: {error: "User session has invalid current URL list"}
+        return
+      end
+
+      repository_name = "#{current_user.uuid}-#{url_list.name}"
+    else
+      if params[:url_list_name]
+        url_list_name = params[:url_list_name]
       else
-        site = Site.find_by name: site_name
-      end
-
-      if site.nil?
-        render status: 400, json: {error: "invalid session"}
+        render status: 400, json: {error: "URL list not specified"}
         return
       end
 
-      if site.urls.empty?
-        render status: 400, json: {error: "empty URL list"}
+      url_list = UrlList.find_by name: url_list_name
+
+      if url_list.nil?
+        render status: 400, json: {error: "URL list not found"}
         return
       end
 
-      index = params[:index].to_i
-      urls = site.urls.split "\n"
+      repository_name = url_list.name
+    end
 
-      if urls.size <= index
-        render status: 400, json: {error: "index out of range"}
-        return
-      end
-
-      session_id = request.session_options[:id]
-
-      if index == 0
-        @@screen_shooters[session_id] = ScreenShooter.new
-
-        if params[:breakpoint] != "all"
-          @@screen_shooters[session_id].set_width BREKPONT_TO_WIDTH[params[:breakpoint]]
-        end
-      end
-
-      Dir.chdir("repo/#{site_name}") do
-        begin
-          if params[:breakpoint] == "all"
-            for breakpoint in BREAKPOINTS
-              @@screen_shooters[session_id].set_width BREKPONT_TO_WIDTH[breakpoint]
-              @@screen_shooters[session_id].shoot urls[index], breakpoint
-            end
-          else
-            @@screen_shooters[session_id].shoot urls[index], params[:breakpoint]
-          end
-        rescue => e
-          p e
-          puts e.backtrace.join("\n")
-
-          @@screen_shooters[session_id].close
-          @@screen_shooters.delete session_id
-
-          render status: 400, json: {error: "invalid URL: #{urls[index]}"}
-          return
-        end
-      end
-
-      if index + 1 == urls.size
-        @@screen_shooters[session_id].close
-        @@screen_shooters.delete session_id
-      end
-
-      render json: {url: urls[index], last: index + 1 == urls.size}
-      return
-    rescue => e
-      p e
-      puts e.backtrace.join("\n")
-      render status: 500, json: {error: "internal server error"}
+    if url_list.urls.empty?
+      render status: 400, json: {error: "Empty URL list"}
       return
     end
+
+    if params[:url_index]
+      index = params[:url_index].to_i
+    else
+      render status: 400, json: {error: "URL index not specified"}
+      return
+    end
+
+    urls = url_list.urls.split "\n"
+
+    if index < 0 || urls.size <= index
+      render status: 400, json: {error: "URL index out of range"}
+      return
+    end
+
+    session_id = request.session_options[:id]
+
+    if index == 0
+      @@screen_shooters[session_id] = ScreenShooter.new
+    end
+
+    Dir.chdir("repo/#{repository_name}") do
+      begin
+        if params[:breakpoint] == "all"
+          for breakpoint in BREAKPOINTS
+            @@screen_shooters[session_id].set_width BREKPONT_TO_WIDTH[breakpoint]
+            @@screen_shooters[session_id].shoot urls[index], breakpoint
+          end
+        else
+          @@screen_shooters[session_id].set_width BREKPONT_TO_WIDTH[params[:breakpoint]]
+          @@screen_shooters[session_id].shoot urls[index], params[:breakpoint]
+        end
+      rescue => e
+        p e
+        puts e.backtrace.join("\n")
+
+        @@screen_shooters[session_id].close
+        @@screen_shooters.delete session_id
+
+        render status: 500, json: {error: "internal server error: #{urls[index]}"}
+        return
+      end
+    end
+
+    if index + 1 == urls.size
+      @@screen_shooters[session_id].close
+      @@screen_shooters.delete session_id
+    end
+
+    render json: {url: urls[index], last: index + 1 == urls.size}
   end
 
   def push_repository
-    begin
-      if user_signed_in?
-        site_name = user_session["current_site_name"]
+    if user_signed_in?
+      if user_session["current_url_list_name"]
+        url_list_name = user_session["current_url_list_name"]
       else
-        site_name = params[:id]
-      end
-
-      if site_name.nil?
-        render status: 400, json: {error: "invalid session"}
+        render status: 400, json: {error: "User session does not have current URL list"}
         return
       end
 
-      if user_signed_in?
-        site = current_user.sites.find_by name: site_name
-        site_name = current_user.uuid + "-" + site_name
-      else
-        site = Site.find_by name: site_name
-      end
+      url_list = current_user.url_lists.find_by name: url_list_name
 
-      if site.nil?
-        render status: 400, json: {error: "invalid session"}
+      if url_list.nil?
+        render status: 400, json: {error: "User session has invalid current URL list"}
         return
       end
 
+      repository_name = "#{current_user.uuid}-#{url_list.name}"
+    else
+      if params[:url_list_name]
+        url_list_name = params[:url_list_name]
+      else
+        render status: 400, json: {error: "URL list not specified"}
+        return
+      end
+
+      url_list = UrlList.find_by name: url_list_name
+
+      if url_list.nil?
+        render status: 400, json: {error: "URL list not found"}
+        return
+      end
+
+      repository_name = url_list.name
+    end
+
+    if params[:commit_message]
       commit_message = params[:commit_message].strip
+    else
+      render status: 400, json: {error: "Commit message not specified"}
+      return
+    end
 
-      repo = Git.open("repo/#{site_name}")
-      repo.add(:all => true)
+    repo = Git.open("repo/#{repository_name}")
+    repo.add(all: true)
 
-      if repo.branches.size == 0 || repo.diff("HEAD", "--").size > 0
-        if commit_message.empty?
-          repo.commit "Snapshots at #{Time.now.to_s}"
-        else
-          repo.commit commit_message
-        end
-        repo.push
+    if not File.exist? repo.index.to_s
+      render status: 400, json: {error: "No changes"}
+      return
+    end
 
-        render json: {url: "https://bitbucket.org/#{ENV["BITBUCKET_USER"]}/#{site_name}/commits/#{repo.gcommit("HEAD").sha}"}
-        return
+    if repo.branches.size == 0 || repo.diff("HEAD", "--").size > 0
+      if commit_message.empty?
+        repo.commit "Snapshots at #{Time.now.to_s}"
       else
-        render status: 400, json: {error: "no changes in URLs"}
-        return
+        repo.commit commit_message
       end
-    rescue => e
-      p e
-      puts e.backtrace.join("\n")
-      render status: 500, json: {error: "internal server error"}
+      repo.push
+
+      render json: {url: "https://bitbucket.org/#{ENV["BITBUCKET_USER"]}/#{repository_name}/commits/#{repo.gcommit("HEAD").sha}"}
+      return
+    else
+      render status: 400, json: {error: "No changes"}
+      return
     end
   end
 end

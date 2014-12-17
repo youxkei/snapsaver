@@ -24,3 +24,4 @@ id_rsa.snapsaver
 repo/*
 vendor/firefox/*
 .vagrant/*
+coverage/*
