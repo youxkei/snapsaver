@@ -15,6 +15,8 @@ Rails.application.routes.draw do
   get "/orphan/:url_list/latest_images" => "latest_images#latest_images"
   get "/orphan/:url_list" => "home#home"
 
+  post "/api/shoot_and_push"
+
   # The priority is based upon order of creation: first created -> highest priority.
   # See how all your routes lay out with "rake routes".
 
